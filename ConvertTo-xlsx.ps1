@@ -5,7 +5,10 @@ function convertTo-Xlsx {
         [System.String]$CsvLocation,
 
         [Parameter(Position = 1)]
-        [System.String]$Destination
+        [System.String]$Destination,
+        
+        [Parameter(Position = 2)]
+        [Switch]$Open
     )
 
     begin {
@@ -13,7 +16,7 @@ function convertTo-Xlsx {
         function Get-Delimiter($csv) {
     
             $excluded = ([Int][Char]'0'..[Int][Char]'9') + ([Int][Char]'A'..[Int][Char]'Z') + ([Int][Char]'a'..[Int][Char]'z') + 32
-            $lines = get-content $csv | Select-Object -first 1
+            $lines = get-content $csv | Select-Object -first 2
         
             $DelimiterHash = @{}
             [Bool]$Quotes = $false
@@ -100,6 +103,10 @@ function convertTo-Xlsx {
             $Excel.ActiveWorkbook.SaveAs($ExcelDestination, 51)
             Write-Verbose "Sucessfully converted $($csv.name) to Excel format."
             $Excel.Quit()
+           
+            if($open){
+                start-process -filepath $ExcelDestination
+            }
         }
     }
     end {
