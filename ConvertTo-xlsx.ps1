@@ -83,7 +83,7 @@ function convertTo-Xlsx {
             $worksheet = $workbook.worksheets.Item(1)
 
             ## Get-FslDelimiter helper function
-            $delimiter = Get-FslDelimiter -csv $csv.fullname
+            $delimiter = Get-Delimiter -csv $csv.fullname
             if($null -eq $delimiter){
                 Write-Warning "Could not retrieve delimiter. You may entered an incorrectly formatted csv file."
                 exit
