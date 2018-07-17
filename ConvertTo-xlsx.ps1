@@ -1,4 +1,33 @@
-function convertTo-Xlsx {
+function Export-FslCsv {
+    <#
+        .SYNOPSIS
+        Converts a csv file into a delimited excel sheet
+
+        .DESCRIPTION
+        Created by Daniel Kim @ FsLogix
+        https://github.com/FSLogix/Fslogix.Powershell.Disk
+
+        .PARAMETER Csvlocation
+        Location of the csv file
+
+        .PARAMETER Destination
+        Optional parameter to where the user would like the place the excel document.
+
+        .PARAMETER Open
+        If the user would like each converted csv file to open in excel.
+
+        .EXAMPLE
+        Export-FslCsv -csvlocation 'C:\Users\Danie\CSV\test.csv'
+        Will convert the csv file, 'test.csv' into an excel document.
+
+        .EXAMPLE
+        Export-FslCsv -csvlocation 'C:\Users\Danie\CSV\Test.csv' -Destination 'C:\Users\Danie\XLSX'
+        Will convert the csv file, 'test.csv' into an excel document and place them into the folder 'XLSX'
+
+        .EXAMPLE
+        Export-FslCsv -csvlocation 'C:\Users\Danie\CSV'
+        Will convert ALL the csv files in directory, 'CSV', into excel documents.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Position = 0, Mandatory = $true, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
@@ -6,46 +35,22 @@ function convertTo-Xlsx {
 
         [Parameter(Position = 1)]
         [System.String]$Destination,
-        
+
         [Parameter(Position = 2)]
-        [Switch]$Open
+        [Switch]$open,
+
+        [Parameter(Position = 3)]
+        [System.String]$email,
+
+        [Parameter(Position = 4)]
+        [System.String]$Username,
+
+        [Parameter(Position = 5)]
+        [System.String]$Password
     )
 
     begin {
         set-strictmode -Version latest
-        function Get-Delimiter($csv) {
-    
-            $excluded = ([Int][Char]'0'..[Int][Char]'9') + ([Int][Char]'A'..[Int][Char]'Z') + ([Int][Char]'a'..[Int][Char]'z') + 32
-            $lines = get-content $csv | Select-Object -first 2
-        
-            $DelimiterHash = @{}
-            [Bool]$Quotes = $false
-        
-            foreach ($char in $lines.ToCharArray()) {
-                #Write-Verbose "$char"
-                if (-not($quotes) -and $char -eq '"') {
-                    $Quotes = $true
-                    continue
-                }
-                if ($Quotes -and $char -eq '"') {
-                    $Quotes = $false
-                    continue
-                }
-                if (-not($Quotes)) {
-                    if ($excluded -notcontains $char) {
-                        $counter = 1
-                        if ($DelimiterHash.ContainsKey($char)) {
-                            $DelimiterHash[$char]++
-                        }
-                        else {
-                            $DelimiterHash.add($char, $counter)
-                        }
-                    }
-                }
-            }
-            $Delimiter = $DelimiterHash.GetEnumerator() | Sort-Object -Property value -Descending | select-object -first 1
-            Write-Output $Delimiter.Key
-        }
     }
 
     process {
@@ -71,10 +76,10 @@ function convertTo-Xlsx {
         }
 
         foreach ($csv in $CSVFiles) {
-        
-            Write-Verbose "Creating excel document for csv file: $($csv.name)"
+
+            Write-Verbose "$(Get-Date): Creating excel document for csv file: $($csv.name)"
             $excel = New-Object -ComObject excel.application
-            if($null -eq $excel){
+            if ($null -eq $excel) {
                 Write-Warning "Could not create excel document. You may have to repair excel installation."
                 exit
             }
@@ -83,17 +88,16 @@ function convertTo-Xlsx {
             $worksheet = $workbook.worksheets.Item(1)
 
             ## Get-FslDelimiter helper function
-            $delimiter = Get-Delimiter -csv $csv.fullname
-            if($null -eq $delimiter){
+            $delimiter = Get-FslDelimiter -csv $csv.fullname
+            if ($null -eq $delimiter) {
                 Write-Warning "Could not retrieve delimiter. You may entered an incorrectly formatted csv file."
                 exit
             }
 
+            $Txt = ("TEXT;" + $csv.fullname)
+            $QueryItems = $worksheet.QueryTables.add($Txt, $worksheet.Range("A1"))
 
-            $TxtConnector = ("TEXT;" + $csv.fullname)
-            $Connector = $worksheet.QueryTables.add($TxtConnector, $worksheet.Range("A1"))
-
-            $query = $worksheet.QueryTables.item($Connector.name)
+            $query = $worksheet.QueryTables.item($QueryItems.name)
             $query.TextFileOtherDelimiter = "$delimiter"
             $query.TextFileParseType = 1
             $query.TextFileColumnDataTypes = , 1 * $worksheet.Cells.Columns.Count
@@ -102,7 +106,7 @@ function convertTo-Xlsx {
             $query.Delete()
 
 
-            if ($Destination -ne "") {
+            if (![System.String]::IsNullOrEmpty($Destination)) {
                 $ExcelDestination = $Destination + "\" + [System.String]$csv.basename + ".xlsx"
             }
             else {
@@ -113,11 +117,42 @@ function convertTo-Xlsx {
             }
 
             $Excel.ActiveWorkbook.SaveAs($ExcelDestination, 51)
-            Write-Verbose "Sucessfully converted $($csv.name) to Excel format."
-            $Excel.Quit()
-           
-            if($open){
-                start-process -filepath $ExcelDestination
+            Write-Verbose "$(Get-Date): Sucessfully converted $($csv.name) to Excel format."
+
+            $Excel.Workbooks.close()
+            $excel.quit()
+
+            if (![System.String]::IsNullOrEmpty($email)) {
+                if ([System.String]::IsNullOrEmpty($Username)) {
+                    $Username = Read-Host "Username"
+                }
+                if ([System.String]::IsNullOrEmpty($Password)) {
+                    $Password = Read-Host "Password"
+                }
+                $mail = new-object Net.Mail.MailMessage
+                $mail.from = "DKim@Fslogix.com"
+                $mail.To.Add($email)
+
+                $mail.Subject = "FsLogix's xlsx document"
+                $attachment = New-Object Net.Mail.Attachment($ExcelDestination)
+                $mail.Attachments.add($attachment)
+
+                $smtp = new-object Net.Mail.SmtpClient("smtp-mail.outlook.com", "587")
+                $smtp.EnableSSL = $true;
+                $smtp.Credentials = New-Object System.Net.NetworkCredential($Username, $Password);
+
+                try {
+                    $smtp.send($mail)
+                    Write-Verbose "Mail sent to: $email"
+                }
+                catch {
+                    Write-Error $Error[0]
+                }
+                $attachment.Dispose()
+            }
+
+            if ($open) {
+                start-process -FilePath $ExcelDestination
             }
         }
     }
