@@ -3,10 +3,6 @@ function Export-FslCsv {
         .SYNOPSIS
         Converts a csv file into a delimited excel sheet
 
-        .DESCRIPTION
-        Created by Daniel Kim @ FsLogix
-        https://github.com/FSLogix/Fslogix.Powershell.Disk
-
         .PARAMETER Csvlocation
         Location of the csv file
 
@@ -15,6 +11,15 @@ function Export-FslCsv {
 
         .PARAMETER Open
         If the user would like each converted csv file to open in excel.
+        
+        .PARAMETER Email
+        User option to have excel document emailed out to an email address.
+        
+        .PARAMETER OutlookUserName
+        The user's email address
+        
+        .PARAMETER Password
+        The user's password
 
         .EXAMPLE
         Export-FslCsv -csvlocation 'C:\Users\Danie\CSV\test.csv'
@@ -27,6 +32,7 @@ function Export-FslCsv {
         .EXAMPLE
         Export-FslCsv -csvlocation 'C:\Users\Danie\CSV'
         Will convert ALL the csv files in directory, 'CSV', into excel documents.
+        
     #>
     [CmdletBinding(DefaultParametersetName = 'None')]
     param (
@@ -56,10 +62,6 @@ function Export-FslCsv {
             <#
                 .SYNOPSIS
                 Returns the delimiter of a csv file
-        
-                .DESCRIPTION
-                Created by Daniel Kim @ FsLogix
-                https://github.com/FSLogix/Fslogix.Powershell.Disk
         
                 .PARAMETER Csv
                 Path to user specified csv file
